@@ -45,6 +45,65 @@ const Main: FC = () => {
     transfer_methods: [TransferMethod.local_file],
   })
 
+  // Add login state
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false)
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    // Check if user is logged in on component mount
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      setIsLoggedIn(true)
+      setUser(JSON.parse(storedUser))
+    }
+  }, [])
+
+  // Login function
+  const handleLogin = async (credentials: { username: string; password: string }) => {
+    try {
+      // Hardcoded credential validation
+      const isValidCredentials = credentials.username === 'admin' && credentials.password === 'password123';
+
+      if (isValidCredentials) {
+        const userData = { username: credentials.username, role: 'admin' };
+        setIsLoggedIn(true);
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+
+      // Use API for validation
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setIsLoggedIn(true);
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      } else {
+        throw new Error('Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      notify({ type: 'error', message: 'Login failed. Please try again.' });
+    }
+  }
+
+  // Logout function
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    setUser(null)
+    localStorage.removeItem('user')
+    // Add any additional logout logic here
+  }
+
   useEffect(() => {
     if (APP_INFO?.title)
       document.title = `${APP_INFO.title} - Powered by Dify`
@@ -609,14 +668,66 @@ const Main: FC = () => {
   if (!APP_ID || !APP_INFO || !promptConfig)
     return <Loading type='app' />
 
+  if (!isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="bg-white p-8 rounded shadow-md">
+          <h2 className="text-2xl mb-4">Login</h2>
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            const formData = new FormData(e.currentTarget)
+            handleLogin({
+              username: formData.get('username') as string,
+              password: formData.get('password') as string,
+            })
+          }}>
+            <input
+              type="text"
+              name="username"
+              placeholder="Username"
+              className="w-full p-2 mb-4 border rounded"
+              required
+            />
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              className="w-full p-2 mb-4 border rounded"
+              required
+            />
+            <button
+              type="submit"
+              className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Login
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // console.log('Current user:', user);
+
   return (
     <div className='bg-gray-100'>
-      <Header
-        title={APP_INFO.title}
-        isMobile={isMobile}
-        onShowSideBar={showSidebar}
-        onCreateNewChat={() => handleConversationIdChange('-1')}
-      />
+      <div className="flex items-center justify-between px-4 h-12">
+        <Header
+          title={APP_INFO.title}
+          isMobile={isMobile}
+          onShowSideBar={showSidebar}
+          onCreateNewChat={() => handleConversationIdChange('-1')}
+        />
+        <div className="flex items-center">
+          <span className="mr-4">{user.username}</span>
+          <button
+            onClick={handleLogout}
+            className="px-2 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
       <div className="flex rounded-t-2xl bg-white overflow-hidden">
         {/* sidebar */}
         {!isMobile && renderSidebar()}
